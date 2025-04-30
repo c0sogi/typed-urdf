@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
+from urllib.parse import ParseResult, urlparse, urlunparse
 from xml.etree.ElementTree import Element, SubElement
 
 from ._utils import Customization, assert_not_none, parse_3_floats, process_attribute
@@ -88,25 +89,63 @@ class Geometry(Component):
     def to_xml_element(self, parent: Element) -> None:
         self.geometry.to_xml_element(SubElement(parent, "geometry"))
 
-    def customize(self, customization: Customization, context: Literal["mesh", "visual"]) -> "Geometry":
+    def customize(self, customization: Customization, context: Literal["collision", "visual"]) -> "Geometry":
         prefix = customization.get("prefix")
         if isinstance(self.geometry, Mesh):
             # filename이 prefix로 시작하지 않으면, prefix를 붙입니다.
             geo = self.geometry
-            filename = Path(geo.filename)
-            if prefix and not self.geometry.filename.startswith(prefix):
-                filename = filename.with_name(f"{prefix}{filename.name}")
             if context == "visual":
                 base = customization.get("visual_basedir")
                 suffix = customization.get("visual_suffix")
-            elif context == "mesh":
-                base = customization.get("mesh_basedir")
-                suffix = customization.get("mesh_suffix")
-            if base:
-                if base.is_file():
-                    base = base.parent
-                filename = base / filename.name
+            elif context == "collision":
+                base = customization.get("collision_basedir")
+                suffix = customization.get("collision_suffix")
+            else:
+                raise ValueError(f"Unknown context: {context}")
+
+            uri_or_path = get_uri_or_path(geo.filename)
+            base_uri_or_path = get_uri_or_path(base) if base else None
+
+            name: str = Path(uri_or_path.path).name if isinstance(uri_or_path, ParseResult) else uri_or_path.name
+            if prefix and not name.startswith(prefix):
+                name = prefix + name
             if suffix:
-                filename = filename.with_suffix(suffix)
-            return self.__class__(geo.__class__(filename=filename.as_posix(), scale=geo.scale))
+                name = Path(name).with_suffix(suffix).name
+
+            if isinstance(base_uri_or_path, ParseResult):
+                filename = unparse_with_path(base_uri_or_path, Path(base_uri_or_path.path) / name)
+            elif isinstance(base_uri_or_path, Path):
+                filename = (base_uri_or_path / name).as_posix()
+            elif isinstance(uri_or_path, ParseResult):
+                filename = unparse_with_path(uri_or_path, Path(uri_or_path.path).with_name(name))
+            elif isinstance(uri_or_path, Path):
+                filename = uri_or_path.with_name(name).as_posix()
+            else:
+                raise ValueError(f"Unknown URI or path type: {type(uri_or_path)}")
+
+            return self.__class__(geo.__class__(filename=filename, scale=geo.scale))
         return self
+
+
+def get_uri_or_path(path: Union[str, Path]) -> Union[ParseResult, Path]:
+    if isinstance(path, Path):
+        return path
+    parsed = urlparse(path)
+    is_uri = all((parsed.scheme, parsed.netloc)) or parsed.scheme in ("mailto", "file", "data")
+    if is_uri:
+        return parsed
+    else:
+        return Path(path)
+
+
+def unparse_with_path(parsed: ParseResult, path: Path) -> str:
+    return urlunparse(
+        ParseResult(
+            scheme=parsed.scheme,
+            netloc=parsed.netloc,
+            path=path.as_posix(),
+            params=parsed.params,
+            query=parsed.query,
+            fragment=parsed.fragment,
+        )
+    )

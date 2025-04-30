@@ -133,7 +133,7 @@ class Collision(Component):
         else:
             name = self.name
         return self.__class__(
-            geometry=self.geometry.customize(customization, "mesh"),
+            geometry=self.geometry.customize(customization, "collision"),
             origin=self.origin,
             name=name,
         )

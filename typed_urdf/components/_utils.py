@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Type, TypedDict, TypeVar
+from typing import Callable, Optional, Tuple, Type, TypedDict, TypeVar, Union
 from xml.etree.ElementTree import Element
 
 from .base import Component
@@ -12,9 +12,9 @@ class Customization(TypedDict, total=False):
     """URDF에서 사용자 정의 속성을 나타내는 딕셔너리입니다."""
 
     prefix: str
-    mesh_basedir: Path
-    mesh_suffix: str
-    visual_basedir: Path
+    collision_basedir: Union[Path, str]
+    collision_suffix: str
+    visual_basedir: Union[Path, str]
     visual_suffix: str
 
 
