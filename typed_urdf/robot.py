@@ -68,7 +68,7 @@ class Robot:
     def to_urdf(self, encoding: str = "utf-8") -> str:
         root = self.to_xml_element()
 
-        def indent(elem: Element, level: int) -> Element[str]:
+        def indent(elem: Element, level: int) -> "Element[str]":
             i = "\n" + level * "  "
             j = "\n" + (level - 1) * "  "
             if len(elem):
